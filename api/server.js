@@ -1,31 +1,54 @@
 const express = require('express');
+const mongoose = require('mongoose');
+const User = require('./models/Usermodel');
+const cors = require('cors')
+
 const PORT = process.env.PORT || 8080;
 const app = express();
-const { MongoClient } = require('mongodb');
-const uri = "mongodb://localhost:27017";
 
-const client = new MongoClient(uri);
+app.use(cors());
+app.use(express.json());
 
-async function main() {
+const uri = "mongodb://localhost:27017/your-database-name"; // replace 'your-database-name' with your actual database name
+
+mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('Connected successfully to MongoDB'))
+    .catch(err => console.error('Could not connect to MongoDB:', err));
+
+app.post('/create-user', async (req, res) => {
+    const { username, secondname, lastname, iin, birthday, email } = req.body;
+
     try {
-        await client.connect();
-        console.log("Connected successfully to MongoDB");
-
-        await listDatabases(client);
-    } catch (e) {
-        console.error(e);
-    } finally {
-        await client.close();
+        const newUser = new User({
+            username,
+            secondname,
+            lastname,
+            iin,
+            birthday,
+            email
+        });
+        await newUser.save();
+        res.status(201).send({ message: 'User created successfully', user: newUser });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: 'Error creating user', error: err.message });
     }
-}
+});
 
-main().catch(console.error);
+app.get('/get-user', async (req, res) => {
+    const { id } = req.query;
 
-async function listDatabases(client) {
-    const databasesList = await client.db().admin().listDatabases();
-    console.log("Databases:");
-    databasesList.databases.forEach(db => console.log(` - ${db.name}`));
-}
+    try {
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).send({ message: 'User not found' });
+        }
+        res.status(200).send(user);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: 'Error fetching user', error: err.message });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Server running on PORT ${PORT}`);
